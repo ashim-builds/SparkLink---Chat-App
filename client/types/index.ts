@@ -1,83 +1,60 @@
-// types/index.ts
-
 export interface User {
-  id: string;
-  username: string;
-  fullName: string;
-  email?: string;
-  avatar?: string;
-  bio?: string;
-  isOnline: boolean;
-  lastSeen?: string;
-  createdAt: string;
+    _id: string;
+    name: string;
+    email: string;
+    handle: string;
+    avatar?: string;
+    bio?: string;
+    isOnline: boolean;
+    lastSeen: string;
 }
 
 export interface Message {
-  id: string;
-  conversationId: string;
-  senderId: string;
-  text: string;
-  type: "text" | "image" | "video" | "audio" | "file";
-  attachmentUrl?: string;
-  isRead: boolean;
-  createdAt: string;
+    _id: string;
+    sender: string;
+    receiver: string;
+    text?: string;
+    mediaUrl?: string;
+    mediaType?: "image" | "video";
+    read: boolean;
+    createdAt: string;
+    conversationId: string;
 }
 
 export interface Conversation {
-  id: string;
-  participants: User[];
-  lastMessage?: Message;
-  unreadCount: number;
-  isGroup: boolean;
-  groupName?: string;
-  groupAvatar?: string;
-  createdAt: string;
-  updatedAt: string;
+    _id: string;
+    participant?: User; // For 1-on-1 chats
+    lastMessage?: Message;
+    updatedAt: string;
 }
 
 export interface Story {
-  id: string;
-  userId: string;
-  mediaUrl: string;
-  type: "image" | "video";
-  caption?: string;
-  viewers: string[];
-  createdAt: string;
-  expiresAt: string;
+    _id: string;
+    user: User;
+    mediaUrl: string;
+    mediaType: "image" | "video";
+    createdAt: string;
 }
 
 export interface UserStory {
-  user: User;
-  stories: Story[];
-  hasViewed: boolean;
+    user: User;
+    stories: Story[];
 }
 
 export interface AuthState {
-  user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
+    user: User | null;
+    token: string | null;
+    loading: boolean;
 }
 
 export interface WsEvent {
-  type:
-    | "message"
-    | "typing"
-    | "online"
-    | "offline"
-    | "story"
-    | "read_receipt";
-
-  payload:
-    | Message
-    | User
-    | Story
-    | {
-        conversationId: string;
-        userId: string;
-        isTyping?: boolean;
-        messageId?: string;
-      };
-
-  timestamp: string;
+    type: string;
+    payload?: any;
+    senderId?: string;
+    isTyping?: boolean;
+    userId?: string;
+    isOnline?: boolean;
+    user?: User;
+    conversationId?: string;
+    [key: string]: any;
 }
