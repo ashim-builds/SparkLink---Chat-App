@@ -11,7 +11,7 @@ import {
 import React, { useState } from "react";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { styles } from "@/components/styles/AuthScreen.styles";
+import { styles } from "@/assets/styles/AuthScreen.styles";
 import { TextInput } from "react-native-gesture-handler";
 import { Colors } from "@/constants/Colors";
 import { LinearGradient } from "expo-linear-gradient";
