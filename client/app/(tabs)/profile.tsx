@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 
 import Avatar from "@/components/Avatar";
 import { styles } from "@/assets/styles/ProfileScreen.styles";
@@ -22,6 +23,29 @@ export default function Profile() {
     ...dummyUserProfile,
   });
 
+  const pickProfileImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (status !== "granted") {
+      Alert.alert("Permission Required", "Please allow photo library access.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      setProfile((prev) => ({
+        ...prev,
+        avatar: result.assets[0].uri,
+      }));
+    }
+  };
+
   const handleSave = () => {
     Alert.alert("Success", "Profile updated successfully");
     setEditing(false);
@@ -29,8 +53,14 @@ export default function Profile() {
 
   const handleSignOut = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive" },
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Sign Out",
+        style: "destructive",
+      },
     ]);
   };
 
@@ -65,7 +95,10 @@ export default function Profile() {
             <Avatar src={profile.avatar} name={profile.name} size={100} />
 
             {editing && (
-              <TouchableOpacity style={styles.cameraOverlay}>
+              <TouchableOpacity
+                style={styles.cameraOverlay}
+                onPress={pickProfileImage}
+              >
                 <Ionicons name="camera" size={24} color="#fff" />
               </TouchableOpacity>
             )}
@@ -91,7 +124,12 @@ export default function Profile() {
               <TextInput
                 style={styles.input}
                 value={profile.name}
-                onChangeText={(text) => setProfile({ ...profile, name: text })}
+                onChangeText={(text) =>
+                  setProfile({
+                    ...profile,
+                    name: text,
+                  })
+                }
               />
             </View>
 
@@ -121,7 +159,12 @@ export default function Profile() {
               <TextInput
                 style={styles.input}
                 value={profile.email}
-                onChangeText={(text) => setProfile({ ...profile, email: text })}
+                onChangeText={(text) =>
+                  setProfile({
+                    ...profile,
+                    email: text,
+                  })
+                }
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -134,13 +177,23 @@ export default function Profile() {
                 multiline
                 style={[styles.input, styles.bioInput]}
                 value={profile.bio}
-                onChangeText={(text) => setProfile({ ...profile, bio: text })}
+                onChangeText={(text) =>
+                  setProfile({
+                    ...profile,
+                    bio: text,
+                  })
+                }
               />
             </View>
 
             <TouchableOpacity style={styles.saveWrapper} onPress={handleSave}>
               <View
-                style={[styles.saveBtn, { backgroundColor: Colors.primary }]}
+                style={[
+                  styles.saveBtn,
+                  {
+                    backgroundColor: Colors.primary,
+                  },
+                ]}
               >
                 <Text style={styles.saveBtnText}>Save Changes</Text>
               </View>
@@ -163,6 +216,7 @@ export default function Profile() {
 
             <Ionicons name="chevron-forward" size={18} color={Colors.outline} />
           </TouchableOpacity>
+
           <TouchableOpacity style={styles.optionRow}>
             <View style={styles.optionIcon}>
               <Ionicons
