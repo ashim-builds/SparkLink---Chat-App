@@ -544,11 +544,11 @@ export const dummyUsers = [
 
 export const dummyUserProfile = {
     _id: "current_user",
-    name: "GreatStack",
-    email: "greatstack@example.com",
-    handle: "greatstack",
-    avatar: "https://yt3.ggpht.com/SxtxAT2eoNsERZyC-2Q9t3YhFC0IPhlaYOFA8rciY3BkhfoR9VPAx5n8A8L6QNG3vjFXSsB7rQ=s240-c-k-c0x00ffffff-no-rj",
-    bio: "Hey there! I am using InstaChat.",
+    name: "DevSpark",
+    email: "devspark@example.com",
+    handle: "devsparkco",
+    avatar: "https://scontent.fktm21-2.fna.fbcdn.net/v/t39.30808-1/723961837_122110722207318166_1826294795657272489_n.jpg?stp=c488.83.1072.1072a_dst-jpg_tt6&cstp=mx1072x1072&ctp=s200x200&_nc_cat=105&ccb=1-7&_nc_sid=2d3e12&_nc_ohc=8T0pxMul008Q7kNvwHAnxB4&_nc_oc=AdpZ64be35BhEO0WvvEhgtbtaZSGm7V5W5r64wQzTm4EY_Z_Am0nguqzFyAMonRFQFM9tDit1Ck5QeEqePshc-mN&_nc_zt=24&_nc_ht=scontent.fktm21-2.fna&_nc_gid=ELJXlNMBMYmgMKRcAEhqjQ&_nc_ss=7b2a8&oh=00_Af-bR5nxVGRsytmmeQFypOZ5B4m_rG_4lAlq5Q-BT0C5gw&oe=6A41435F",
+    bio: "Hey there! I am using SparkLink.",
     isOnline: true,
     lastSeen: "2026-06-02T07:52:28.905Z",
 };
