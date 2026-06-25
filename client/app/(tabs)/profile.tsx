@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,14 +16,34 @@ import * as ImagePicker from "expo-image-picker";
 import Avatar from "@/components/Avatar";
 import { styles } from "@/assets/styles/ProfileScreen.styles";
 import { Colors } from "@/constants/Colors";
-import { dummyUserProfile } from "@/assets/assets";
+import { useApp } from "@/context/AppContext";
+import { User } from "@/types";
 
 export default function Profile() {
+  const { auth, logout, refreshProfile, updateUser } = useApp();
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState<User | null>(auth.user);
+  const [avatarUri, setAvatarUri] = useState<string | undefined>();
 
-  const [profile, setProfile] = useState({
-    ...dummyUserProfile,
-  });
+  useEffect(() => {
+    if (!editing) {
+      setProfile(auth.user);
+      setAvatarUri(undefined);
+    }
+  }, [auth.user, editing]);
+
+  const startEditing = () => {
+    setProfile(auth.user);
+    setAvatarUri(undefined);
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setProfile(auth.user);
+    setAvatarUri(undefined);
+    setEditing(false);
+  };
 
   const pickProfileImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -39,30 +61,119 @@ export default function Profile() {
     });
 
     if (!result.canceled && result.assets.length > 0) {
+      const uri = result.assets[0].uri;
+      setAvatarUri(uri);
       setProfile((prev) => ({
-        ...prev,
-        avatar: result.assets[0].uri,
+        ...(prev as User),
+        avatar: uri,
       }));
     }
   };
 
-  const handleSave = () => {
-    Alert.alert("Success", "Profile updated successfully");
-    setEditing(false);
+  const handleSave = async () => {
+    if (!profile) return;
+    if (!profile.name.trim()) {
+      Alert.alert("Validation", "Name is required.");
+      return;
+    }
+    if (!profile.handle.trim()) {
+      Alert.alert("Validation", "Username is required.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateUser({
+        name: profile.name.trim(),
+        handle: profile.handle.toLowerCase().replace(/\s/g, ""),
+        bio: profile.bio ?? "",
+        avatarUri,
+      });
+      Alert.alert("Success", "Profile updated successfully.");
+      setEditing(false);
+      setAvatarUri(undefined);
+    } catch (error: any) {
+      Alert.alert(
+        "Update Failed",
+        error?.message || "Could not update your profile.",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Sign Out",
-        style: "destructive",
-      },
-    ]);
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm("Are you sure you want to sign out?");
+      if (confirmed) {
+        logout();
+      }
+    } else {
+      Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: () => {
+            logout();
+          },
+        },
+      ]);
+    }
   };
+
+  if (auth.loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 14,
+            padding: 24,
+          }}
+        >
+          <Ionicons
+            name="person-circle-outline"
+            size={56}
+            color={Colors.outline}
+          />
+          <Text style={[styles.title, { textAlign: "center" }]}>
+            Profile unavailable
+          </Text>
+          <Text style={[styles.userBio, { textAlign: "center" }]}>
+            {auth.error ||
+              "We could not load your profile. Please try again."}
+          </Text>
+          <TouchableOpacity style={styles.saveWrapper} onPress={() => refreshProfile(true)}>
+            <View style={[styles.saveBtn, { backgroundColor: Colors.primary }]}>
+              <Text style={styles.saveBtnText}>Retry</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+            <Ionicons name="log-out-outline" size={20} color={Colors.error} />
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -76,7 +187,8 @@ export default function Profile() {
 
           <TouchableOpacity
             style={styles.editBtn}
-            onPress={() => setEditing(!editing)}
+            onPress={editing ? cancelEditing : startEditing}
+            disabled={saving}
           >
             <Ionicons
               name={editing ? "close-outline" : "create-outline"}
@@ -98,6 +210,7 @@ export default function Profile() {
               <TouchableOpacity
                 style={styles.cameraOverlay}
                 onPress={pickProfileImage}
+                disabled={saving}
               >
                 <Ionicons name="camera" size={24} color="#fff" />
               </TouchableOpacity>
@@ -159,12 +272,7 @@ export default function Profile() {
               <TextInput
                 style={styles.input}
                 value={profile.email}
-                onChangeText={(text) =>
-                  setProfile({
-                    ...profile,
-                    email: text,
-                  })
-                }
+                editable={false}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -176,7 +284,7 @@ export default function Profile() {
               <TextInput
                 multiline
                 style={[styles.input, styles.bioInput]}
-                value={profile.bio}
+                value={profile.bio ?? ""}
                 onChangeText={(text) =>
                   setProfile({
                     ...profile,
@@ -186,7 +294,11 @@ export default function Profile() {
               />
             </View>
 
-            <TouchableOpacity style={styles.saveWrapper} onPress={handleSave}>
+            <TouchableOpacity
+              style={[styles.saveWrapper, saving && { opacity: 0.7 }]}
+              onPress={handleSave}
+              disabled={saving}
+            >
               <View
                 style={[
                   styles.saveBtn,
@@ -195,7 +307,11 @@ export default function Profile() {
                   },
                 ]}
               >
-                <Text style={styles.saveBtnText}>Save Changes</Text>
+                {saving ? (
+                  <ActivityIndicator color={Colors.onPrimary} size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save Changes</Text>
+                )}
               </View>
             </TouchableOpacity>
           </View>
@@ -203,7 +319,10 @@ export default function Profile() {
 
         {/* Settings */}
         <View style={styles.optionsSection}>
-          <TouchableOpacity style={styles.optionRow}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() => Alert.alert("Settings", "Settings are up to date.")}
+          >
             <View style={styles.optionIcon}>
               <Ionicons
                 name="settings-outline"
@@ -217,7 +336,15 @@ export default function Profile() {
             <Ionicons name="chevron-forward" size={18} color={Colors.outline} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionRow}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() =>
+              Alert.alert(
+                "Notifications",
+                "Notification preferences coming soon.",
+              )
+            }
+          >
             <View style={styles.optionIcon}>
               <Ionicons
                 name="notifications-outline"
@@ -231,7 +358,10 @@ export default function Profile() {
             <Ionicons name="chevron-forward" size={18} color={Colors.outline} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionRow}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() => Alert.alert("Privacy", "Your account is protected.")}
+          >
             <View style={styles.optionIcon}>
               <Ionicons
                 name="lock-closed-outline"
@@ -245,7 +375,12 @@ export default function Profile() {
             <Ionicons name="chevron-forward" size={18} color={Colors.outline} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionRow}>
+          <TouchableOpacity
+            style={styles.optionRow}
+            onPress={() =>
+              Alert.alert("Help & Support", "Contact support from SparkLink.")
+            }
+          >
             <View style={styles.optionIcon}>
               <Ionicons
                 name="help-circle-outline"

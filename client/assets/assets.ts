@@ -548,7 +548,7 @@ export const dummyUserProfile = {
   email: "devspark@example.com",
   handle: "devsparkco",
   avatar:
-    "https://scontent.fktm21-2.fna.fbcdn.net/v/t39.30808-1/723961837_122110722207318166_1826294795657272489_n.jpg?stp=c488.83.1072.1072a_dst-jpg_tt6&cstp=mx1072x1072&ctp=s200x200&_nc_cat=105&ccb=1-7&_nc_sid=2d3e12&_nc_ohc=8T0pxMul008Q7kNvwHAnxB4&_nc_oc=AdpZ64be35BhEO0WvvEhgtbtaZSGm7V5W5r64wQzTm4EY_Z_Am0nguqzFyAMonRFQFM9tDit1Ck5QeEqePshc-mN&_nc_zt=24&_nc_ht=scontent.fktm21-2.fna&_nc_gid=ELJXlNMBMYmgMKRcAEhqjQ&_nc_ss=7b2a8&oh=00_Af-bR5nxVGRsytmmeQFypOZ5B4m_rG_4lAlq5Q-BT0C5gw&oe=6A41435Fz",
+    "https://scontent.fktm21-1.fna.fbcdn.net/v/t39.30808-1/720602368_122190063590388856_890841227359285742_n.jpg?stp=dst-jpg_tt6&cstp=mx206x206&ctp=s200x200&_nc_cat=111&ccb=1-7&_nc_sid=1d2534&_nc_eui2=AeG9UwsoDpwN8U1VI4imD530v_D3mOuy496_8PeY67Lj3nalSWMpm3iwhemd6ya5VyYWQEJPnzstcsIzI50GYNim&_nc_ohc=kuI6JDRXSxYQ7kNvwHAdgjz&_nc_oc=AdpvHQjH0fOc7Q-4WEHzKTeiFKOymec-JmACBjE0cc4J713JnER1z1QdK2jUq5_slJix5NQDsOwlTmiJkyoxe3pI&_nc_zt=24&_nc_ht=scontent.fktm21-1.fna&_nc_gid=GRm027md5Z2CNVTiWtVWZg&_nc_ss=7b2a8&oh=00_Af9nLDlm0Psci1-I2TlOc5cOUGA250IOaROQ6UeOnWEZfA&oe=6A41C7BA",
   bio: "Hey there! I am using SparkLink.",
   isOnline: true,
   lastSeen: "2026-06-02T07:52:28.905Z",

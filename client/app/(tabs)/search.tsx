@@ -1,4 +1,10 @@
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import React, { useEffect, useState } from "react";
 import type { User as IUser } from "../../types";
 import { useRouter } from "expo-router";
@@ -8,10 +14,9 @@ import { styles } from "@/assets/styles/SearchScreen.styles";
 import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { TextInput } from "react-native-gesture-handler";
-import { FlatList } from "react-native";
 import Avatar from "@/components/Avatar";
 
-export default function search() {
+export default function Search() {
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<IUser[]>([]);
   const [loading, setLoading] = useState(false);

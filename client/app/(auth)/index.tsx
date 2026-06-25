@@ -16,11 +16,17 @@ import { TextInput } from "react-native-gesture-handler";
 import { Colors } from "@/constants/Colors";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { Alert } from "react-native";
+import { useClerk, useSignIn, useSignUp } from "@clerk/expo";
 // import { SvgXml } from "react-native-svg";
 
 type Mode = "login" | "register";
 
 export default function AuthScreen() {
+  const { signIn } = useSignIn();
+  const { signUp } = useSignUp();
+  const { setActive } = useClerk();
+
   const [mode, setMode] = React.useState<Mode>("login");
   const [name, setName] = React.useState("");
   const [handle, setHandle] = React.useState("");
@@ -29,23 +35,129 @@ export default function AuthScreen() {
   const [verificationCode, setVerificationCode] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [verifying, setVerifying] = React.useState(false);
+  const [verifyingMode, setVerifyingMode] = React.useState<
+    "login" | "login_mfa" | "register"
+  >("register");
 
   const router = useRouter();
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim())
+      return Alert.alert("Validation", "Please fill all fields");
+    if (mode === "register" && (!name.trim() || !handle.trim()))
+      return Alert.alert("Validation", "Please fill all fields");
+
     setLoading(true);
-    setTimeout(() => {
+    try {
+      if (mode === "login") {
+        if (!signIn) return;
+        const result = await signIn.create({
+          identifier: email,
+          password,
+        });
+        if (result.error) {
+          throw result.error;
+        }
+        if (signIn.status === "complete") {
+          await setActive({ session: signIn.createdSessionId });
+          router.replace("/(tabs)");
+        } else if (signIn.status === "needs_first_factor" && signIn.emailCode) {
+          await signIn.emailCode.sendCode();
+          setVerifyingMode("login");
+          setVerifying(true);
+        } else if (signIn.status === "needs_second_factor" && signIn.mfa) {
+          await signIn.mfa.sendEmailCode();
+          setVerifyingMode("login_mfa");
+          setVerifying(true);
+        }
+      } else {
+        if (!signUp) return;
+
+        const spaceIdx = name.trim().indexOf(" ");
+        const firstName =
+          spaceIdx !== -1 ? name.trim().substring(0, spaceIdx) : name.trim();
+        const lastName =
+          spaceIdx !== -1 ? name.trim().substring(spaceIdx + 1) : "";
+
+        const result = await signUp.create({
+          emailAddress: email,
+          password,
+          firstName,
+          lastName,
+          username: handle.toLowerCase().replace(/\s/g, ""),
+        });
+        if (result.error) {
+          throw result.error;
+        }
+        const sendResult = await signUp.verifications.sendEmailCode();
+        if (sendResult.error) {
+          throw sendResult.error;
+        }
+        setVerifyingMode("register");
+        setVerifying(true);
+      }
+    } catch (err: any) {
+      Alert.alert(
+        "Authentication Error",
+        err?.errors?.[0]?.message || err?.message || "Something went wrong",
+      );
+    } finally {
       setLoading(false);
-      setVerifying(true);
-    }, 1500);
+    }
   };
 
   const handleVerify = async () => {
+    if (!verificationCode.trim())
+      return Alert.alert("Validation", "Please enter the verification code");
+
     setLoading(true);
-    setTimeout(() => {
+    try {
+      if (verifyingMode === "register") {
+        if (!signUp) return;
+        const result = await signUp.verifications.verifyEmailCode({
+          code: verificationCode,
+        });
+        if (result.error) {
+          throw result.error;
+        }
+        if (signUp.status === "complete") {
+          await setActive({ session: signUp.createdSessionId });
+          router.replace("/(tabs)");
+        } else {
+          Alert.alert(
+            "Verification Faild",
+            "Please check the code and try again.",
+          );
+        }
+      } else {
+        if (!signIn) return;
+        if (verifyingMode === "login_mfa") {
+          await signIn.mfa.verifyEmailCode({
+            code: verificationCode,
+          });
+        } else {
+          await signIn.emailCode.verifyCode({
+            code: verificationCode,
+          });
+        }
+        if (signIn.status === "complete") {
+          await setActive({ session: signIn.createdSessionId });
+          router.replace("/(tabs)");
+        } else {
+          Alert.alert(
+            "Verification Faild",
+            "Please check the code and try again.",
+          );
+        }
+      }
+    } catch (err: any) {
+      Alert.alert(
+        "Verification Error",
+        err?.errors?.[0]?.message || err?.message || "Invalid code, try again",
+      );
+    } finally {
       setLoading(false);
-      router.replace("/(tabs)");
-    }, 1500);
+    }
   };
 
   if (verifying) {
