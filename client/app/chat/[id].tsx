@@ -29,7 +29,7 @@ import { TextInput } from "react-native-gesture-handler";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 
-export default function chatScreen() {
+export default function ChatScreen() {
   const router = useRouter();
   let { auth, messages, users, selectedConversation, typingUsers } = {
     auth: { user: dummyUserProfile },
@@ -43,7 +43,7 @@ export default function chatScreen() {
 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
@@ -56,7 +56,7 @@ export default function chatScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  });
+  }, [messages.length]);
 
   const deleteChat = () => {};
 
@@ -105,7 +105,7 @@ export default function chatScreen() {
   if (!selectedConversation) {
     return (
       <SafeAreaViewBase style={styles.safe}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color={Colors.onSurface} />
         </TouchableOpacity>
         <View style={styles.emptyState}>
