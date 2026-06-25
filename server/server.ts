@@ -1,11 +1,16 @@
 import "dotenv/config";
 import express, { Request, Response } from "express";
 import cors from "cors";
+import http from "http";
 import connectDB from "./config/db.js";
 import { clerkMiddleware } from "@clerk/express";
 import userRouter from "./routes/UserRoutes.js";
+import messageRouter from "./routes/MessageRoutes.js";
+import storyRouter from "./routes/StoryRoutes.js";
+import { initSocket } from "./socket/socketManager.js";
 
 const app = express();
+const server = http.createServer(app);
 
 // Middleware
 app.use(cors());
@@ -14,12 +19,17 @@ app.use(clerkMiddleware());
 
 const port = process.env.PORT || 3000;
 
+// Initialize Socket.io
+initSocket(server);
+
 app.get("/", (req: Request, res: Response) => {
   res.send("Server is Live!");
 });
 app.use("/api/users", userRouter);
+app.use("/api/messages", messageRouter);
+app.use("/api/stories", storyRouter);
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
 });
 

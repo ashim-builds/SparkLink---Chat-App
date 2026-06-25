@@ -4,11 +4,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
+  RefreshControl,
+  Platform,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { Conversation, UserStory } from "@/types";
 import { useRouter } from "expo-router";
-import { dummyConversationData } from "@/assets/assets";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "@/assets/styles/MessagesScreen.styles";
 import { Colors } from "@/constants/Colors";
@@ -17,33 +18,37 @@ import { TextInput } from "react-native-gesture-handler";
 import StoriesBar from "@/components/StoriesBar";
 import StoryViewer from "@/components/StoryViewer";
 import ConvoItem from "@/components/ConvoItem";
+import { useSocket } from "@/context/SocketContext";
 
 export default function MessagesScreen() {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const { conversations, fetchConversations, stories } = useSocket();
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedStory, setSelectedStory] = useState<UserStory | null>(null);
 
   const router = useRouter();
 
-  const fetchconversations = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setConversations(dummyConversationData as any);
-      setLoading(false);
-    }, 1000);
-  };
-
   useEffect(() => {
-    fetchconversations();
+    (async () => {
+      setLoading(true);
+      await fetchConversations();
+      setLoading(false);
+    })();
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchConversations();
+    setRefreshing(false);
+  };
 
   const lowerSearch = search.toLowerCase();
   const filtered = search
     ? conversations.filter(
         (c) =>
           c.participant?.name.toLowerCase().includes(lowerSearch) ||
-          c.participant?.handle.toLowerCase().includes(lowerSearch),
+          c.participant?.handle.toLowerCase().includes(lowerSearch)
       )
     : conversations;
 
@@ -105,6 +110,13 @@ export default function MessagesScreen() {
           data={filtered}
           keyExtractor={(c) => c._id}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.primary}
+            />
+          }
           renderItem={({ item }) => (
             <ConvoItem
               convo={item}
@@ -119,7 +131,7 @@ export default function MessagesScreen() {
                 size={44}
                 color={Colors.outlineVariant}
               />
-              <Text style={styles.emptyTitle}>No conversation yet</Text>
+              <Text style={styles.emptyTitle}>No conversations yet</Text>
               <Text style={styles.emptySubtitle}>
                 Go to search to start chatting
               </Text>
