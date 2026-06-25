@@ -2,7 +2,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaViewBase,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -10,14 +9,8 @@ import {
   ActivityIndicator,
   FlatList,
 } from "react-native";
-import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "expo-router";
-import {
-  dummyConversationData,
-  dummyMessages,
-  dummyUserProfile,
-  dummyUsers,
-} from "@/assets/assets";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "@/assets/styles/ChatScreen.styles";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,28 +21,78 @@ import Bubble from "@/components/Bubble";
 import { TextInput } from "react-native-gesture-handler";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import { Message, User } from "@/types";
+import { useApp } from "@/context/AppContext";
+import { useSocket } from "@/context/SocketContext";
+import { API_BASE_URL } from "@/constants/Config";
 
 export default function ChatScreen() {
   const router = useRouter();
-  let { auth, messages, users, selectedConversation, typingUsers } = {
-    auth: { user: dummyUserProfile },
-    messages: dummyMessages,
-    users: dummyUsers,
-    selectedConversation: dummyConversationData[0],
-    typingUsers: {
-      [dummyUsers[0]._id]: true,
-    },
-  };
+  const { id: conversationId } = useLocalSearchParams<{ id: string }>();
+  const { auth } = useApp();
+  const { socket, typingState, setConversations } = useSocket();
 
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [partner, setPartner] = useState<User | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [mediaUri, setMediaUri] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const partner = selectedConversation?.participant;
+  // Fetch messages and partner info
+  const fetchMessages = useCallback(async () => {
+    if (!auth.token || !conversationId) return;
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/messages/${conversationId}`,
+        { headers: { Authorization: `Bearer ${auth.token}` } }
+      );
+      const data = await res.json();
+      if (data.success) setMessages(data.messages);
 
-  // Scroll to bottom when messages update
+      // Mark as read
+      await fetch(
+        `${API_BASE_URL}/api/messages/${conversationId}/read`,
+        {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${auth.token}` },
+        }
+      );
+    } catch (err) {
+      console.warn("fetchMessages error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [auth.token, conversationId]);
+
+  // Resolve partner from conversations
+  useEffect(() => {
+    if (!auth.token || !conversationId) return;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/messages/conversations`, {
+          headers: { Authorization: `Bearer ${auth.token}` },
+        });
+        const data = await res.json();
+        if (data.success) {
+          const convo = data.conversations.find(
+            (c: any) => c._id === conversationId
+          );
+          if (convo?.participant) setPartner(convo.participant);
+        }
+      } catch (err) {
+        console.warn("resolve partner error:", err);
+      }
+    })();
+  }, [auth.token, conversationId]);
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
+
+  // Scroll on new messages
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => {
@@ -58,53 +101,154 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
-  const deleteChat = () => {};
+  // Listen for real-time incoming messages
+  useEffect(() => {
+    if (!socket) return;
+    const handleMessage = (newMsg: Message) => {
+      if (newMsg.conversationId === conversationId) {
+        setMessages((prev) => [...prev, newMsg]);
+        // Mark as read immediately
+        if (auth.token) {
+          fetch(`${API_BASE_URL}/api/messages/${conversationId}/read`, {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${auth.token}` },
+          });
+        }
+      }
+    };
+    const handleRead = ({
+      conversationId: cId,
+    }: {
+      conversationId: string;
+      readerId: string;
+    }) => {
+      if (cId === conversationId) {
+        setMessages((prev) =>
+          prev.map((m) => ({ ...m, read: true }))
+        );
+      }
+    };
+    socket.on("message", handleMessage);
+    socket.on("messages_read", handleRead);
+    return () => {
+      socket.off("message", handleMessage);
+      socket.off("messages_read", handleRead);
+    };
+  }, [socket, conversationId, auth.token]);
+
+  const handleTyping = (val: string) => {
+    setText(val);
+    if (!socket || !partner) return;
+    socket.emit("typing", {
+      conversationId,
+      receiverId: partner._id,
+      isTyping: true,
+    });
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      socket.emit("typing", {
+        conversationId,
+        receiverId: partner._id,
+        isTyping: false,
+      });
+    }, 2000);
+  };
 
   const pickMedia = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     if (status !== "granted") {
-      Alert.alert("Permission Required", "Please allow photo library access.");
+      if (Platform.OS === "web") {
+        window.alert("Please allow photo library access.");
+      } else {
+        Alert.alert("Permission Required", "Please allow photo library access.");
+      }
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images", "videos"],
       quality: 0.8,
     });
-
     if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setMediaUri(asset.uri);
+      setMediaUri(result.assets[0].uri);
     }
   };
 
-  const handleTyping = (val: string) => {
-    setText(val);
-  };
-
   const send = async () => {
-    if ((!text.trim() && !mediaUri) || !selectedConversation) return;
+    if ((!text.trim() && !mediaUri) || !conversationId || !auth.token) return;
     setSending(true);
-    setTimeout(() => {
+    try {
+      const formData = new FormData();
+      formData.append("conversationId", conversationId);
+      if (text.trim()) formData.append("text", text.trim());
+
+      if (mediaUri) {
+        if (
+          Platform.OS === "web" ||
+          mediaUri.startsWith("data:") ||
+          mediaUri.startsWith("blob:")
+        ) {
+          const blob = await (await fetch(mediaUri)).blob();
+          formData.append("media", blob, "media.jpg");
+        } else {
+          const ext = mediaUri.split(".").pop()?.toLowerCase() || "jpg";
+          const mime = ext === "mp4" || ext === "mov" ? "video/mp4" : "image/jpeg";
+          formData.append("media", {
+            uri: mediaUri,
+            name: `media.${ext}`,
+            type: mime,
+          } as any);
+        }
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/messages`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${auth.token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages((prev) => [...prev, data.message]);
+        setText("");
+        setMediaUri(null);
+        // Stop typing indicator
+        if (socket && partner) {
+          socket.emit("typing", {
+            conversationId,
+            receiverId: partner._id,
+            isTyping: false,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("send error:", err);
+    } finally {
       setSending(false);
-      setText("");
-      setMediaUri(null);
-    }, 500);
+    }
   };
 
-  // Typing indicator helpers
+  const initiateCall = (type: "audio" | "video") => {
+    if (!partner) return;
+    router.push({
+      pathname: "/call",
+      params: {
+        partnerId: partner._id,
+        partnerName: partner.name,
+        partnerAvatar: partner.avatar || "",
+        conversationId,
+        callType: type,
+        isOutgoing: "true",
+      },
+    });
+  };
 
-  const typingEntries = Object.entries(typingUsers).filter(
-    ([uid, isTyping]) => {
-      if (!isTyping || uid === auth.user?._id) return false;
-      return partner?._id === uid;
-    },
-  );
+  // Typing indicator from partner
+  const partnerTyping =
+    partner &&
+    typingState[conversationId]?.[partner._id] === true;
 
-  if (!selectedConversation) {
+  if (!partner && !loading) {
     return (
-      <SafeAreaViewBase style={styles.safe}>
+      <SafeAreaView style={styles.safe}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color={Colors.onSurface} />
         </TouchableOpacity>
@@ -116,17 +260,16 @@ export default function ChatScreen() {
           />
           <Text style={styles.emptyText}>Conversation not found</Text>
         </View>
-      </SafeAreaViewBase>
+      </SafeAreaView>
     );
   }
 
-  const headerName = partner!.name;
-  const headerAvater = partner!.avatar;
-  const headerSub = partner!.isOnline
+  const headerSub = partner?.isOnline
     ? "Online"
     : partner?.lastSeen
-      ? `Last Seen ${formatTime(partner.lastSeen)}`
-      : "offline";
+    ? `Last seen ${formatTime(partner.lastSeen)}`
+    : "Offline";
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       {/* Header */}
@@ -135,38 +278,41 @@ export default function ChatScreen() {
           <Ionicons name="chevron-back" size={24} color={Colors.onSurface} />
         </TouchableOpacity>
         <Avatar
-          name={headerName}
-          src={headerAvater}
+          name={partner?.name || ""}
+          src={partner?.avatar}
           size={38}
           online={partner?.isOnline}
         />
         <View style={styles.headerInfo}>
           <Text style={styles.headerName} numberOfLines={1}>
-            {headerName}
+            {partner?.name}
           </Text>
           <Text style={styles.headerHandle}>@{partner?.handle}</Text>
           <Text
             style={[
               styles.headerSub,
-              partner.isOnline && { color: Colors.online },
+              partner?.isOnline && { color: Colors.online },
             ]}
           >
-            {headerSub}
+            {partnerTyping ? "typing..." : headerSub}
           </Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.backBtn}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => initiateCall("audio")}
+          >
             <Ionicons name="call-outline" size={24} color={Colors.onSurface} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.backBtn}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => initiateCall("video")}
+          >
             <Ionicons
               name="videocam-outline"
               size={24}
               color={Colors.onSurface}
             />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.backBtn} onPress={deleteChat}>
-            <Ionicons name="trash-outline" size={24} color={Colors.onSurface} />
           </TouchableOpacity>
         </View>
       </View>
@@ -199,26 +345,29 @@ export default function ChatScreen() {
             onContentSizeChange={() =>
               flatListRef.current?.scrollToEnd({ animated: false })
             }
-          />
-        )}
-
-        {/* Typing indicator */}
-        {typingEntries.length > 0 && (
-          <View style={styles.typingRow}>
-            {typingEntries.map(([uid]) => {
-              const u = users.find((x) => x._id === uid) || partner;
-              return (
-                <Text key={uid} style={styles.typingText}>
-                  {u?.name || "Someone"} is typing...
+            ListEmptyComponent={
+              <View style={{ flex: 1, alignItems: "center", paddingTop: 60 }}>
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={48}
+                  color={Colors.outlineVariant}
+                />
+                <Text
+                  style={{
+                    color: Colors.outlineVariant,
+                    marginTop: 12,
+                    fontSize: 15,
+                  }}
+                >
+                  Say hello to {partner?.name}!
                 </Text>
-              );
-            })}
-          </View>
+              </View>
+            }
+          />
         )}
 
         {/* Input Bar */}
         <View style={styles.inputBar}>
-          {/* Media Preview */}
           {mediaUri && (
             <View style={styles.mediaPreview}>
               <Image source={{ uri: mediaUri }} style={styles.mediaThumb} />

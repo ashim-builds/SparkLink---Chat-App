@@ -4,39 +4,86 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
+  Alert,
 } from "react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import type { User as IUser } from "../../types";
 import { useRouter } from "expo-router";
-import { dummyUsers } from "@/assets/assets";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { styles } from "@/assets/styles/SearchScreen.styles";
 import { Colors } from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { TextInput } from "react-native-gesture-handler";
 import Avatar from "@/components/Avatar";
+import { useApp } from "@/context/AppContext";
+import { useSocket } from "@/context/SocketContext";
+import { API_BASE_URL } from "@/constants/Config";
 
 export default function Search() {
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<IUser[]>([]);
   const [loading, setLoading] = useState(false);
+  const [startingChat, setStartingChat] = useState<string | null>(null);
   const router = useRouter();
+  const { auth } = useApp();
+  const { fetchConversations } = useSocket();
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (query: string) => {
+    if (!auth.token) return;
     setLoading(true);
-    setTimeout(() => {
-      setUsers(dummyUsers);
+    try {
+      const url = query.trim()
+        ? `${API_BASE_URL}/api/users/search?query=${encodeURIComponent(query)}`
+        : `${API_BASE_URL}/api/users`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${auth.token}` },
+      });
+      const data = await res.json();
+      if (data.success) setUsers(data.users || []);
+    } catch (err) {
+      console.warn("fetchUsers error:", err);
+    } finally {
       setLoading(false);
-    }, 1000);
-  };
+    }
+  }, [auth.token]);
 
+  // Debounced search
   useEffect(() => {
-    const timer = setTimeout(fetchUsers, 300);
+    const timer = setTimeout(() => fetchUsers(search), 300);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, fetchUsers]);
 
   const startChat = async (user: IUser) => {
-    router.push(`/chat/${user._id}`);
+    if (!auth.token) return;
+    setStartingChat(user._id);
+    try {
+      // Create/find conversation by sending empty message
+      const res = await fetch(`${API_BASE_URL}/api/messages`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${auth.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ receiverId: user._id, text: "" }),
+      });
+      const data = await res.json();
+      if (data.success && data.message?.conversationId) {
+        await fetchConversations();
+        router.push(`/chat/${data.message.conversationId}`);
+      } else if (data.success && !data.message) {
+        // conversationId was returned directly
+        await fetchConversations();
+      }
+    } catch (err) {
+      if (Platform.OS === "web") {
+        window.alert("Could not start conversation. Please try again.");
+      } else {
+        Alert.alert("Error", "Could not start conversation. Please try again.");
+      }
+    } finally {
+      setStartingChat(null);
+    }
   };
 
   return (
@@ -80,6 +127,7 @@ export default function Search() {
             <TouchableOpacity
               style={styles.userRow}
               onPress={() => startChat(u)}
+              disabled={startingChat === u._id}
               activeOpacity={0.7}
             >
               <Avatar
@@ -89,18 +137,22 @@ export default function Search() {
                 online={u.isOnline}
               />
               <View style={styles.userInfo}>
-                <View style={styles.nameRow}></View>
+                <View style={styles.nameRow} />
                 <Text style={styles.userName}>{u.name}</Text>
                 <Text style={styles.userHandle}>@{u.handle}</Text>
               </View>
               <Text style={styles.userEmail} numberOfLines={1}>
-                {u.email}
+                {startingChat === u._id ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  u.email
+                )}
               </Text>
             </TouchableOpacity>
           )}
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {search ? "No users found" : "search for people to chat with"}
+              {search ? "No users found" : "Search for people to chat with"}
             </Text>
           }
         />

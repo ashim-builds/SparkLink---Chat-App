@@ -1,4 +1,5 @@
 import { AppProvider } from "@/context/AppContext";
+import { SocketProvider } from "@/context/SocketContext";
 import {
   SplashScreen,
   Stack,
@@ -76,21 +77,24 @@ export default function RootLayout() {
       <ClerkLoaded>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <AppProvider>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-              }}
-            >
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen
-                name="(chat)/[id]"
-                options={{ animation: "slide_from_right" }}
-              />
-            </Stack>
-            {/* AuthGuard is placed after Stack so the nav container is ready */}
-            <AuthGuard />
-            <StatusBar style="dark" />
+            <SocketProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                }}
+              >
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen
+                  name="chat/[id]"
+                  options={{ animation: "slide_from_right" }}
+                />
+                <Stack.Screen name="call" options={{ animation: "slide_from_right" }} />
+              </Stack>
+              {/* AuthGuard is placed after Stack so the nav container is ready */}
+              <AuthGuard />
+              <StatusBar style="dark" />
+            </SocketProvider>
           </AppProvider>
         </GestureHandlerRootView>
       </ClerkLoaded>
