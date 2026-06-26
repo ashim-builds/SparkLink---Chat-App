@@ -24,6 +24,9 @@ if (!publishableKey) {
   throw new Error("Add your Clerk Publishable Key to the .env file");
 }
 
+// AuthGuard: watches Clerk's auth state and redirects accordingly.
+// Must be rendered INSIDE the navigation tree (inside Stack or as a sibling
+// rendered after the Stack element) so that useRouter / useSegments work.
 function AuthGuard() {
   const { isSignedIn, isLoaded } = useAuth();
   const segments = useSegments();
@@ -31,6 +34,7 @@ function AuthGuard() {
   const navigationReady = useRef(false);
 
   useEffect(() => {
+    // Mark navigation as ready after first mount
     navigationReady.current = true;
   }, []);
 
@@ -49,6 +53,7 @@ function AuthGuard() {
     }
   }, [isSignedIn, isLoaded, segments, router]);
 
+  // Show a loading spinner until Clerk has loaded
   if (!isLoaded) {
     return (
       <View
