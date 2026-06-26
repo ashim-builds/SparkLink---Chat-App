@@ -68,7 +68,6 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.logoRow}>
           <Image
@@ -94,7 +93,6 @@ export default function MessagesScreen() {
         </View>
       </View>
 
-      {/* Search */}
       <View style={styles.searchRow}>
         <Ionicons name="search" size={16} color={Colors.outlineVariant} />
         <TextInput
@@ -115,7 +113,6 @@ export default function MessagesScreen() {
         )}
       </View>
 
-      {/* Stories */}
       <StoriesBar onviewStory={(us) => setSelectedStory(us)} />
 
       {selectedStory && (
@@ -125,7 +122,6 @@ export default function MessagesScreen() {
         />
       )}
 
-      {/* Message Requests */}
       {messageRequests.length > 0 && (
         <View style={styles.requestsSection}>
           <View style={styles.requestsHeader}>
@@ -165,10 +161,8 @@ export default function MessagesScreen() {
         </View>
       )}
 
-      {/* Divider */}
       <View style={styles.divider} />
 
-      {/* Conversation list */}
       {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />
       ) : (
