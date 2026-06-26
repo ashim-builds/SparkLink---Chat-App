@@ -8,6 +8,14 @@ import userRouter from "./routes/UserRoutes.js";
 import messageRouter from "./routes/MessageRoutes.js";
 import storyRouter from "./routes/StoryRoutes.js";
 import { initSocket } from "./socket/socketManager.js";
+import dns from "node:dns";
+
+if (
+  dns.getServers().includes("127.0.0.1") ||
+  dns.getServers().includes("::1")
+) {
+  dns.setServers(["1.1.1.1", "8.8.8.8"]);
+}
 
 const app = express();
 const server = http.createServer(app);
