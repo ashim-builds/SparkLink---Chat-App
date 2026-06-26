@@ -48,7 +48,6 @@ export default function Search() {
     }
   }, [auth.token]);
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => fetchUsers(search), 300);
     return () => clearTimeout(timer);
@@ -58,7 +57,6 @@ export default function Search() {
     if (!auth.token) return;
     setStartingChat(user._id);
     try {
-      // Create/find conversation by sending empty message
       const res = await fetch(`${API_BASE_URL}/api/messages`, {
         method: "POST",
         headers: {
@@ -72,7 +70,6 @@ export default function Search() {
         await fetchConversations();
         router.push(`/chat/${data.message.conversationId}`);
       } else if (data.success && !data.message) {
-        // conversationId was returned directly
         await fetchConversations();
       }
     } catch (err) {
@@ -88,19 +85,17 @@ export default function Search() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Search</Text>
       </View>
 
-      {/* Search */}
       <View style={styles.searchRow}>
         <Ionicons name="search" size={16} color={Colors.outlineVariant} />
         <TextInput
           style={styles.searchInput}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search by name, email or handle ..."
+          placeholder="Search by name or handle..."
           placeholderTextColor={Colors.outlineVariant}
           autoCapitalize="none"
         />
@@ -115,7 +110,6 @@ export default function Search() {
         )}
       </View>
 
-      {/* Results */}
       {loading ? (
         <ActivityIndicator style={{ marginTop: 40 }} color={Colors.primary} />
       ) : (
@@ -137,17 +131,12 @@ export default function Search() {
                 online={u.isOnline}
               />
               <View style={styles.userInfo}>
-                <View style={styles.nameRow} />
                 <Text style={styles.userName}>{u.name}</Text>
                 <Text style={styles.userHandle}>@{u.handle}</Text>
               </View>
-              <Text style={styles.userEmail} numberOfLines={1}>
-                {startingChat === u._id ? (
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                ) : (
-                  u.email
-                )}
-              </Text>
+              {startingChat === u._id && (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              )}
             </TouchableOpacity>
           )}
           ListEmptyComponent={

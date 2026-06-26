@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 
 import Avatar from "@/components/Avatar";
 import { styles } from "@/assets/styles/ProfileScreen.styles";
@@ -20,6 +21,7 @@ import { useApp } from "@/context/AppContext";
 import { User } from "@/types";
 
 export default function Profile() {
+  const router = useRouter();
   const { auth, logout, refreshProfile, updateUser } = useApp();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -321,7 +323,7 @@ export default function Profile() {
         <View style={styles.optionsSection}>
           <TouchableOpacity
             style={styles.optionRow}
-            onPress={() => Alert.alert("Settings", "Settings are up to date.")}
+            onPress={() => router.push("/settings")}
           >
             <View style={styles.optionIcon}>
               <Ionicons
@@ -338,12 +340,7 @@ export default function Profile() {
 
           <TouchableOpacity
             style={styles.optionRow}
-            onPress={() =>
-              Alert.alert(
-                "Notifications",
-                "Notification preferences coming soon.",
-              )
-            }
+            onPress={() => router.push("/notifications")}
           >
             <View style={styles.optionIcon}>
               <Ionicons
@@ -360,7 +357,7 @@ export default function Profile() {
 
           <TouchableOpacity
             style={styles.optionRow}
-            onPress={() => Alert.alert("Privacy", "Your account is protected.")}
+            onPress={() => router.push("/blocked-users")}
           >
             <View style={styles.optionIcon}>
               <Ionicons
@@ -370,7 +367,7 @@ export default function Profile() {
               />
             </View>
 
-            <Text style={styles.optionText}>Privacy</Text>
+            <Text style={styles.optionText}>Blocked Users</Text>
 
             <Ionicons name="chevron-forward" size={18} color={Colors.outline} />
           </TouchableOpacity>

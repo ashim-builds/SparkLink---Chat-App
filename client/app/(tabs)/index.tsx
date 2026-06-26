@@ -6,6 +6,7 @@ import {
   FlatList,
   RefreshControl,
   Platform,
+  Image,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { Conversation, UserStory } from "@/types";
@@ -19,9 +20,11 @@ import StoriesBar from "@/components/StoriesBar";
 import StoryViewer from "@/components/StoryViewer";
 import ConvoItem from "@/components/ConvoItem";
 import { useSocket } from "@/context/SocketContext";
+import { useSupabase } from "@/context/SupabaseContext";
 
 export default function MessagesScreen() {
   const { conversations, fetchConversations, stories } = useSocket();
+  const { unreadNotificationCount, messageRequests, acceptMessageRequest, declineMessageRequest } = useSupabase();
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,15 +59,38 @@ export default function MessagesScreen() {
     router.push(`/chat/${c._id}`);
   };
 
+  const handleAcceptRequest = async (requestId: string) => {
+    const conversation = await acceptMessageRequest(requestId);
+    if (conversation) {
+      router.push(`/chat/${conversation.conversation_id}`);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Conversations</Text>
+        <View style={styles.logoRow}>
+          <Image
+            source={require("../../assets/images/icon.png")}
+            style={styles.logoImage}
+          />
+          <Text style={styles.appName}>SparkLink</Text>
+        </View>
         <View style={styles.headerRight}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{conversations.length}</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => router.push("/notifications")}
+          >
+            <Ionicons name="notifications-outline" size={22} color={Colors.onSurface} />
+            {unreadNotificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -97,6 +123,46 @@ export default function MessagesScreen() {
           userStory={selectedStory}
           onClose={() => setSelectedStory(null)}
         />
+      )}
+
+      {/* Message Requests */}
+      {messageRequests.length > 0 && (
+        <View style={styles.requestsSection}>
+          <View style={styles.requestsHeader}>
+            <Text style={styles.requestsTitle}>Message Requests</Text>
+            <Text style={styles.requestsCount}>{messageRequests.length} new</Text>
+          </View>
+          <FlatList
+            data={messageRequests}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.requestItem}>
+                <Image
+                  source={{ uri: item.sender?.avatar || "https://via.placeholder.com/48" }}
+                  style={styles.requestAvatar}
+                />
+                <View style={styles.requestContent}>
+                  <Text style={styles.requestName}>{item.sender?.name || "Unknown"}</Text>
+                </View>
+                <View style={styles.requestActions}>
+                  <TouchableOpacity
+                    style={styles.acceptBtn}
+                    onPress={() => handleAcceptRequest(item.id)}
+                  >
+                    <Text style={styles.acceptText}>Accept</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.declineBtn}
+                    onPress={() => declineMessageRequest(item.id)}
+                  >
+                    <Text style={styles.declineText}>Decline</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            scrollEnabled={false}
+          />
+        </View>
       )}
 
       {/* Divider */}

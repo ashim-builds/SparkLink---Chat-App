@@ -1,16 +1,17 @@
 import { AppProvider } from "@/context/AppContext";
 import { SocketProvider } from "@/context/SocketContext";
+import { SupabaseProvider } from "@/context/SupabaseContext";
 import {
   SplashScreen,
   Stack,
   useRouter,
   useSegments,
-  useNavigationContainerRef,
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ClerkLoaded, ClerkProvider, useAuth } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
+import { MenuProvider } from "react-native-popup-menu";
 import { useEffect, useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { Colors } from "@/constants/Colors";
@@ -77,24 +78,30 @@ export default function RootLayout() {
       <ClerkLoaded>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <AppProvider>
-            <SocketProvider>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                }}
-              >
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen
-                  name="chat/[id]"
-                  options={{ animation: "slide_from_right" }}
-                />
-                <Stack.Screen name="call" options={{ animation: "slide_from_right" }} />
-              </Stack>
-              {/* AuthGuard is placed after Stack so the nav container is ready */}
-              <AuthGuard />
-              <StatusBar style="dark" />
-            </SocketProvider>
+            <SupabaseProvider>
+              <SocketProvider>
+                <MenuProvider>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                    }}
+                  >
+                    <Stack.Screen name="(auth)" />
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen
+                      name="chat/[id]"
+                      options={{ animation: "slide_from_right" }}
+                    />
+                    <Stack.Screen name="call" options={{ animation: "slide_from_right" }} />
+                    <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
+                    <Stack.Screen name="notifications" options={{ animation: "slide_from_right" }} />
+                    <Stack.Screen name="blocked-users" options={{ animation: "slide_from_right" }} />
+                  </Stack>
+                  <AuthGuard />
+                  <StatusBar style="dark" />
+                </MenuProvider>
+              </SocketProvider>
+            </SupabaseProvider>
           </AppProvider>
         </GestureHandlerRootView>
       </ClerkLoaded>
