@@ -23,7 +23,7 @@ export default function Bubble({ msg, isMine }: BubbleProps) {
           colors={[Colors.primary, Colors.primaryContainer]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={(styles.bubble, styles.bubbleMe)}
+          style={[styles.bubble, styles.bubbleMe]}
         >
           {content}
         </LinearGradient>
@@ -53,7 +53,7 @@ function BubbleContent({ msg, isMine }: { msg: Message; isMine: boolean }) {
         </View>
       )}
 
-      {msg.text && (
+      {!!msg.text && (
         <Text
           style={[
             styles.msgText,

@@ -25,12 +25,15 @@ import { Message, User } from "@/types";
 import { useApp } from "@/context/AppContext";
 import { useSocket } from "@/context/SocketContext";
 import { API_BASE_URL } from "@/constants/Config";
+import { useAuth } from "@clerk/expo";
 
 export default function ChatScreen() {
   const router = useRouter();
   const { id: conversationId } = useLocalSearchParams<{ id: string }>();
   const { auth } = useApp();
+  const { getToken } = useAuth();
   const { socket, typingState, setConversations } = useSocket();
+  const [conversationExists, setConversationExists] = useState(true);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [partner, setPartner] = useState<User | null>(null);
@@ -41,25 +44,54 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const getAuthToken = async () => {
+    const token = await getToken();
+
+    if (!token) {
+      router.replace("/(auth)");
+      return null;
+    }
+
+    return token;
+  };
+
   // Fetch messages and partner info
   const fetchMessages = useCallback(async () => {
-    if (!auth.token || !conversationId) return;
+    if (!conversationId) return;
+
+    const token = await getAuthToken();
+    if (!token) return;
     try {
       const res = await fetch(
         `${API_BASE_URL}/api/messages/${conversationId}`,
-        { headers: { Authorization: `Bearer ${auth.token}` } }
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
       const data = await res.json();
-      if (data.success) setMessages(data.messages);
+      if (data.success) {
+        setConversationExists(true);
+        setMessages(data.messages);
+      } else {
+        setConversationExists(false);
+        setMessages([]);
+      }
+      if (res.status === 404) {
+        setConversationExists(false);
+        setMessages([]);
+        setLoading(false);
+        return;
+      }
 
       // Mark as read
-      await fetch(
-        `${API_BASE_URL}/api/messages/${conversationId}/read`,
-        {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${auth.token}` },
-        }
-      );
+      await fetch(`${API_BASE_URL}/api/messages/${conversationId}/read`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
     } catch (err) {
       console.warn("fetchMessages error:", err);
     } finally {
@@ -69,7 +101,7 @@ export default function ChatScreen() {
 
   // Resolve partner from conversations
   useEffect(() => {
-    if (!auth.token || !conversationId) return;
+    if (!conversationId) return;
     (async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/messages/conversations`, {
@@ -78,7 +110,7 @@ export default function ChatScreen() {
         const data = await res.json();
         if (data.success) {
           const convo = data.conversations.find(
-            (c: any) => c._id === conversationId
+            (c: any) => c._id === conversationId,
           );
           if (convo?.participant) setPartner(convo.participant);
         }
@@ -108,12 +140,17 @@ export default function ChatScreen() {
       if (newMsg.conversationId === conversationId) {
         setMessages((prev) => [...prev, newMsg]);
         // Mark as read immediately
-        if (auth.token) {
-          fetch(`${API_BASE_URL}/api/messages/${conversationId}/read`, {
+        (async () => {
+          const token = await getAuthToken();
+          if (!token) return;
+
+          await fetch(`${API_BASE_URL}/api/messages/${conversationId}/read`, {
             method: "PATCH",
-            headers: { Authorization: `Bearer ${auth.token}` },
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           });
-        }
+        })();
       }
     };
     const handleRead = ({
@@ -123,9 +160,7 @@ export default function ChatScreen() {
       readerId: string;
     }) => {
       if (cId === conversationId) {
-        setMessages((prev) =>
-          prev.map((m) => ({ ...m, read: true }))
-        );
+        setMessages((prev) => prev.map((m) => ({ ...m, read: true })));
       }
     };
     socket.on("message", handleMessage);
@@ -160,7 +195,10 @@ export default function ChatScreen() {
       if (Platform.OS === "web") {
         window.alert("Please allow photo library access.");
       } else {
-        Alert.alert("Permission Required", "Please allow photo library access.");
+        Alert.alert(
+          "Permission Required",
+          "Please allow photo library access.",
+        );
       }
       return;
     }
@@ -174,7 +212,10 @@ export default function ChatScreen() {
   };
 
   const send = async () => {
-    if ((!text.trim() && !mediaUri) || !conversationId || !auth.token) return;
+    if ((!text.trim() && !mediaUri) || !conversationId) return;
+
+    const token = await getAuthToken();
+    if (!token) return;
     setSending(true);
     try {
       const formData = new FormData();
@@ -191,7 +232,8 @@ export default function ChatScreen() {
           formData.append("media", blob, "media.jpg");
         } else {
           const ext = mediaUri.split(".").pop()?.toLowerCase() || "jpg";
-          const mime = ext === "mp4" || ext === "mov" ? "video/mp4" : "image/jpeg";
+          const mime =
+            ext === "mp4" || ext === "mov" ? "video/mp4" : "image/jpeg";
           formData.append("media", {
             uri: mediaUri,
             name: `media.${ext}`,
@@ -202,7 +244,7 @@ export default function ChatScreen() {
 
       const res = await fetch(`${API_BASE_URL}/api/messages`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${auth.token}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
       const data = await res.json();
@@ -243,13 +285,21 @@ export default function ChatScreen() {
 
   // Typing indicator from partner
   const partnerTyping =
-    partner &&
-    typingState[conversationId]?.[partner._id] === true;
+    partner && typingState[conversationId]?.[partner._id] === true;
 
   if (!partner && !loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace("/(tabs)");
+            }
+          }}
+        >
           <Ionicons name="chevron-back" size={24} color={Colors.onSurface} />
         </TouchableOpacity>
         <View style={styles.emptyState}>
@@ -267,8 +317,8 @@ export default function ChatScreen() {
   const headerSub = partner?.isOnline
     ? "Online"
     : partner?.lastSeen
-    ? `Last seen ${formatTime(partner.lastSeen)}`
-    : "Offline";
+      ? `Last seen ${formatTime(partner.lastSeen)}`
+      : "Offline";
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
