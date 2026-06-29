@@ -17,7 +17,11 @@ import { Colors } from "@/constants/Colors";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { Alert } from "react-native";
-import { useClerk, useSignIn, useSignUp } from "@clerk/expo";
+import { useClerk, useSignIn, useSignUp, useOAuth } from "@clerk/expo";
+import * as WebBrowser from "expo-web-browser";
+
+WebBrowser.maybeCompleteAuthSession();
+
 // import { SvgXml } from "react-native-svg";
 
 type Mode = "login" | "register";
@@ -26,6 +30,9 @@ export default function AuthScreen() {
   const { signIn } = useSignIn();
   const { signUp } = useSignUp();
   const { setActive } = useClerk();
+  const { startOAuthFlow: startGoogleFlow } = useOAuth({ strategy: "oauth_google" });
+
+  const router = useRouter();
 
   const [mode, setMode] = React.useState<Mode>("login");
   const [name, setName] = React.useState("");
@@ -39,7 +46,24 @@ export default function AuthScreen() {
     "login" | "login_mfa" | "register"
   >("register");
 
-  const router = useRouter();
+  const onGoogleSignInPress = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const { createdSessionId } = await startGoogleFlow();
+      if (createdSessionId) {
+        await setActive({ session: createdSessionId });
+        router.replace("/(tabs)");
+      }
+    } catch (err: any) {
+      console.log("OAuth Error:", err);
+      Alert.alert(
+        "OAuth Error",
+        err?.errors?.[0]?.message || err?.message || "Failed to sign in with Google."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [startGoogleFlow, router, setActive]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim())
@@ -379,6 +403,37 @@ export default function AuthScreen() {
                 </>
               )}
             </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginVertical: 18, gap: 10, paddingHorizontal: 4 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: Colors.outlineVariant }} />
+            <Text style={{ fontSize: 13, color: Colors.outline, fontWeight: "600" }}>Or connect with</Text>
+            <View style={{ flex: 1, height: 1, backgroundColor: Colors.outlineVariant }} />
+          </View>
+
+          {/* Google OAuth Button */}
+          <TouchableOpacity
+            onPress={onGoogleSignInPress}
+            disabled={loading}
+            activeOpacity={0.85}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              borderWidth: 1.5,
+              borderColor: Colors.outlineVariant,
+              borderRadius: 16,
+              paddingVertical: 14,
+              backgroundColor: Colors.surfaceLowest,
+              marginBottom: 10
+            }}
+          >
+            <Ionicons name="logo-google" size={18} color={Colors.onSurface} />
+            <Text style={{ fontSize: 15, fontWeight: "700", color: Colors.onSurface }}>
+              Continue with Google
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

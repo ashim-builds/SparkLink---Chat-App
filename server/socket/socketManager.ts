@@ -38,6 +38,24 @@ export function initSocket(server: any) {
       }
     });
 
+    // Listen for privacy toggles on online status visibility
+    socket.on("online_preference_changed", async (data: { userId: string; showOnline: boolean }) => {
+      if (!data.userId) return;
+      try {
+        await User.findByIdAndUpdate(data.userId, {
+          isOnline: data.showOnline,
+          lastSeen: new Date(),
+        });
+        ioInstance?.emit("user_status_changed", {
+          userId: data.userId,
+          isOnline: data.showOnline,
+          lastSeen: new Date(),
+        });
+      } catch (err) {
+        console.error("Error updating online status preference:", err);
+      }
+    });
+
     // Relay typing status to recipient
     socket.on("typing", (data: { conversationId: string; receiverId: string; isTyping: boolean }) => {
       const senderId = socketUserMap.get(socket.id);

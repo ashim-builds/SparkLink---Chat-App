@@ -173,6 +173,18 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       fetchStories();
     });
 
+    socket.on("conversation_theme_updated", ({ conversationId, theme }: { conversationId: string; theme: "default" | "love" | "friendly" | "fifa" }) => {
+      setConversations((prev) =>
+        prev.map((c) => (c._id === conversationId ? { ...c, theme } : c))
+      );
+    });
+
+    socket.on("conversation_accepted", ({ conversationId, status }: { conversationId: string; status: "accepted" }) => {
+      setConversations((prev) =>
+        prev.map((c) => (c._id === conversationId ? { ...c, status } : c))
+      );
+    });
+
     // Listen for incoming calls
     socket.on(
       "incoming_call",

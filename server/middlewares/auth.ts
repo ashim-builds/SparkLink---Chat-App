@@ -27,7 +27,11 @@ export const authMiddleware = async (
     if (!localUser) {
       // Lazy sync: Fetch details from Clerk API
       const clerkUser = await clerkClient.users.getUser(userId);
-      const email = clerkUser.emailAddresses[0]?.emailAddress;
+      const email =
+        clerkUser.emailAddresses[0]?.emailAddress ||
+        (clerkUser.username
+          ? `${clerkUser.username}@sparklink.com`
+          : `${userId}@sparklink.com`);
       const name =
         [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
         clerkUser.username ||
@@ -35,7 +39,7 @@ export const authMiddleware = async (
       // Create fallback handle
       const handle =
         clerkUser.username ||
-        clerkUser.emailAddresses[0]?.emailAddress.split("@")[0] ||
+        clerkUser.emailAddresses[0]?.emailAddress?.split("@")[0] ||
         userId;
 
       // Ensure unique handle in DB by appending random suffix if needed

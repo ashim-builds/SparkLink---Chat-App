@@ -25,6 +25,9 @@ export interface Conversation {
   _id: string;
   participant?: User; // For 1-on-1 chats
   lastMessage?: Message;
+  theme?: "default" | "love" | "friendly" | "fifa";
+  status?: "pending" | "accepted" | "declined";
+  requestSender?: string;
   updatedAt: string;
 }
 

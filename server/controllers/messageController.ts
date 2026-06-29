@@ -36,6 +36,8 @@ export const getConversations = async (req: AuthRequest, res: Response) => {
             lastSeen: new Date(),
           },
           lastMessage: convo.lastMessage,
+          status: convo.status || "pending",
+          requestSender: convo.requestSender,
           updatedAt: convo.updatedAt,
         };
       })
@@ -86,6 +88,12 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
     const senderId = req.user!.id;
     let finalConvoId = conversationId;
 
+    // Prevent empty messages for existing chats
+    if (finalConvoId && !text?.trim() && !req.file) {
+      res.status(400).json({ success: false, message: "Cannot send empty message" });
+      return;
+    }
+
     // Create conversation if starting a new chat
     if (!finalConvoId) {
       if (!receiverId) {
@@ -101,6 +109,8 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
       if (!convo) {
         convo = await Conversation.create({
           participants: [senderId, receiverId],
+          status: "pending",
+          requestSender: senderId,
         });
       }
       finalConvoId = convo._id;
@@ -114,6 +124,31 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
 
     if (!convo.participants.includes(senderId)) {
       res.status(403).json({ success: false, message: "Unauthorized to send in this conversation" });
+      return;
+    }
+
+    // Lock subsequent messages if status is pending and sender is request sender
+    if (convo.status === "pending" && convo.requestSender === senderId) {
+      // Check if there are already messages in this conversation. If so, block.
+      const msgCount = await Message.countDocuments({ conversationId: finalConvoId });
+      if (msgCount > 0) {
+        res.status(403).json({ success: false, message: "Message request is pending acceptance." });
+        return;
+      }
+    }
+
+    // If recipient replies, implicitly accept request
+    if (convo.status === "pending" && convo.requestSender !== senderId) {
+      convo.status = "accepted";
+      await convo.save();
+    }
+
+    // If starting chat from search with empty message, just return conversationId without saving a blank message
+    if (!text?.trim() && !req.file) {
+      res.json({
+        success: true,
+        message: { conversationId: finalConvoId },
+      });
       return;
     }
 
@@ -183,6 +218,8 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         _id: convo._id,
         participant: await User.findById(actualReceiverId).select("name email handle avatar bio isOnline lastSeen"),
         lastMessage: newMessage,
+        status: convo.status,
+        requestSender: convo.requestSender,
         updatedAt: convo.updatedAt,
       };
 
@@ -190,6 +227,8 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         _id: convo._id,
         participant: await User.findById(senderId).select("name email handle avatar bio isOnline lastSeen"),
         lastMessage: newMessage,
+        status: convo.status,
+        requestSender: convo.requestSender,
         updatedAt: convo.updatedAt,
       };
 
@@ -236,5 +275,137 @@ export const markAsRead = async (req: AuthRequest, res: Response) => {
   } catch (err) {
     console.error("MarkAsRead Error:", err);
     res.status(500).json({ success: false, message: "Error marking messages as read" });
+  }
+};
+
+export const acceptConversation = async (req: AuthRequest, res: Response) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user!.id;
+
+    const convo = await Conversation.findById(conversationId);
+    if (!convo) {
+      res.status(404).json({ success: false, message: "Conversation not found" });
+      return;
+    }
+
+    if (!convo.participants.includes(userId)) {
+      res.status(403).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    convo.status = "accepted";
+    await convo.save();
+
+    // Trigger WebSockets if recipient is online
+    const io = getIO();
+    const partnerId = convo.participants.find((p) => p !== userId);
+    if (io && partnerId) {
+      const partnerSocket = getSocketIdByUserId(partnerId);
+      const mySocket = getSocketIdByUserId(userId);
+      const updatePayload = {
+        conversationId,
+        status: "accepted",
+      };
+      if (partnerSocket) {
+        io.to(partnerSocket).emit("conversation_accepted", updatePayload);
+      }
+      if (mySocket) {
+        io.to(mySocket).emit("conversation_accepted", updatePayload);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("AcceptConversation Error:", err);
+    res.status(500).json({ success: false, message: "Error accepting conversation" });
+  }
+};
+
+export const deleteConversation = async (req: AuthRequest, res: Response) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user!.id;
+
+    const convo = await Conversation.findById(conversationId);
+    if (!convo) {
+      res.status(404).json({ success: false, message: "Conversation not found" });
+      return;
+    }
+
+    if (!convo.participants.includes(userId)) {
+      res.status(403).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    // Delete all messages in the conversation
+    await Message.deleteMany({ conversationId });
+    // Delete the conversation document
+    await Conversation.findByIdAndDelete(conversationId);
+
+    // Notify partner via sockets that conversation was deleted
+    const io = getIO();
+    const partnerId = convo.participants.find((p) => p !== userId);
+    if (io && partnerId) {
+      const partnerSocket = getSocketIdByUserId(partnerId);
+      if (partnerSocket) {
+        io.to(partnerSocket).emit("conversation_deleted", { conversationId });
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("DeleteConversation Error:", err);
+    res.status(500).json({ success: false, message: "Error deleting conversation" });
+  }
+};
+
+export const updateTheme = async (req: AuthRequest, res: Response) => {
+  try {
+    const { conversationId } = req.params;
+    const { theme } = req.body;
+    const userId = req.user!.id;
+
+    if (!["default", "love", "friendly", "fifa"].includes(theme)) {
+      res.status(400).json({ success: false, message: "Invalid theme" });
+      return;
+    }
+
+    const convo = await Conversation.findById(conversationId);
+    if (!convo) {
+      res.status(404).json({ success: false, message: "Conversation not found" });
+      return;
+    }
+
+    if (!convo.participants.includes(userId)) {
+      res.status(403).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    convo.theme = theme;
+    await convo.save();
+
+    // Trigger WebSockets if recipient is online
+    const io = getIO();
+    const partnerId = convo.participants.find((p) => p !== userId);
+    if (io && partnerId) {
+      const partnerSocket = getSocketIdByUserId(partnerId);
+      const mySocket = getSocketIdByUserId(userId);
+      const updatePayload = {
+        conversationId,
+        theme,
+      };
+      if (partnerSocket) {
+        io.to(partnerSocket).emit("conversation_theme_updated", updatePayload);
+      }
+      if (mySocket) {
+        io.to(mySocket).emit("conversation_theme_updated", updatePayload);
+      }
+    }
+
+    res.json({ success: true, theme });
+  } catch (err) {
+    console.error("UpdateTheme Error:", err);
+    res.status(500).json({ success: false, message: "Error updating theme" });
   }
 };

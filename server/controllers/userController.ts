@@ -7,12 +7,12 @@ import { Readable } from "stream";
 // Get all users
 export const getUsers = async (req: AuthRequest, res: Response) => {
   const users = await User.find({ _id: { $ne: req.user!.id } }).select(
-    "name email handle avatar bio isOnline lastSeen",
+    "name handle avatar bio isOnline lastSeen",
   );
   res.json({ success: true, users });
 };
 
-// Search users by name, email, or handle
+// Search users by name or handle
 
 export const searchUsers = async (req: AuthRequest, res: Response) => {
   const { query } = req.query;
@@ -23,9 +23,9 @@ export const searchUsers = async (req: AuthRequest, res: Response) => {
   const regex = new RegExp(query, "i");
   const users = await User.find({
     _id: { $ne: req.user!.id },
-    $or: [{ name: regex }, { email: regex }, { handle: regex }],
+    $or: [{ name: regex }, { handle: regex }],
   })
-    .select("name email handle avatar bio isOnline lastSeen")
+    .select("name handle avatar bio isOnline lastSeen")
     .limit(20);
   res.json({ success: true, users });
 };

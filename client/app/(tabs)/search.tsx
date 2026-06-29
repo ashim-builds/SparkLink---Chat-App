@@ -100,7 +100,7 @@ export default function Search() {
           style={styles.searchInput}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search by name, email or handle ..."
+          placeholder="Search by name or handle..."
           placeholderTextColor={Colors.outlineVariant}
           autoCapitalize="none"
         />
@@ -141,13 +141,13 @@ export default function Search() {
                 <Text style={styles.userName}>{u.name}</Text>
                 <Text style={styles.userHandle}>@{u.handle}</Text>
               </View>
-              <Text style={styles.userEmail} numberOfLines={1}>
+              <View style={{ justifyContent: "center", alignItems: "center" }}>
                 {startingChat === u._id ? (
                   <ActivityIndicator size="small" color={Colors.primary} />
                 ) : (
-                  u.email
+                  <Ionicons name="chatbubble-ellipses-outline" size={22} color={Colors.primary} />
                 )}
-              </Text>
+              </View>
             </TouchableOpacity>
           )}
           ListEmptyComponent={

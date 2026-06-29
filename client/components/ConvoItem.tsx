@@ -5,6 +5,8 @@ import { styles } from "@/assets/styles/ConvoItem.styles";
 import Avatar from "./Avatar";
 import { formatTime } from "@/utils/formatTime";
 
+import { decryptMessage } from "@/utils/encryption";
+
 interface ConvoItemProps {
   convo: Conversation;
   selected: boolean;
@@ -20,8 +22,10 @@ export default function ConvoItem({
   const avatar = convo.participant?.avatar;
   const online = convo.participant?.isOnline;
   const sub = `@${convo.participant?.handle}`;
+  const rawText = convo.lastMessage?.text || "";
+  const decryptedText = rawText ? decryptMessage(rawText, convo._id) : "";
   const lastMsg =
-    convo.lastMessage?.text ||
+    decryptedText ||
     (convo.lastMessage?.mediaType === "image"
       ? "📷 photo"
       : convo.lastMessage?.mediaUrl
